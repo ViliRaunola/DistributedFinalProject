@@ -16,6 +16,8 @@ def test():
     print('Hello from test function')
     return True
 
+def 
+
 def run_server(host=hostname, port=portnumber):
     server_addr = (host, port)
     server = SimpleThreadedXMLRPCServer(server_addr)
