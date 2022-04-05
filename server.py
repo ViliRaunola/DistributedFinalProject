@@ -1,10 +1,5 @@
 from xmlrpc.server import SimpleXMLRPCServer
-from xmlrpc.server import SimpleXMLRPCRequestHandler
 from socketserver import ThreadingMixIn
-import xml.etree.ElementTree as ET
-import requests
-import re
-
 
 hostname = 'localhost'
 portnumber = 3000
