@@ -41,6 +41,7 @@ def main():
         while True:
             user_input = menu()
             if user_input == '1':
+                #Check for if articles exists or not. If they do execution continues
                 if not start_search():
                     continue
                 print('jatkuu')
