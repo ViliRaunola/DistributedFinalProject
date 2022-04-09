@@ -21,6 +21,7 @@ def test():
     print('Hello from test function')
     return True
 
+#function to check wether the end and start points exists.
 def check_articles(start_article, end_article):
     #Initializing wikipedia object and defining the language for the search
     wiki_wiki = wikipediaapi.Wikipedia('en') 
