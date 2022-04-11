@@ -27,11 +27,16 @@ def start_search():
 
     if json_response['success']:
         print(json_response['message'])
-        return True
     else:
         print(json_response['message'])
         print('Please try different articles!')
         return False
+
+    rpc.shortest_path(start_article, end_article)
+
+    return True
+
+    
     
 
 
@@ -41,10 +46,8 @@ def main():
         while True:
             user_input = menu()
             if user_input == '1':
-                #Check for if articles exists or not. If they do execution continues
                 if not start_search():
                     continue
-                print('jatkuu')
             elif user_input == '0':
                 print('Closing...')
                 exit(0)
