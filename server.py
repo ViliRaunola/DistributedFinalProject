@@ -82,6 +82,8 @@ def get_links(parent_article):
 #Adding the found articles to a parent node    
 def add_links_to_tree(links, parent, end_article, q):
     global stop_search
+    #Initializing wikipedia object and defining the language for the search
+    wiki_wiki = wikipediaapi.Wikipedia('en') 
     for title in links.keys():
         title_exists = wiki_wiki.page(title).exists()
         if title_exists:
@@ -90,13 +92,14 @@ def add_links_to_tree(links, parent, end_article, q):
             q.put(child) #Adds the new child also to the queu
         #If one of the articles matches the end result a global flag is raised
         if title == end_article:
+            print(title)
             stop_search = True
             break
     
 
 def worker(end_article, q):
-    while stop_search:
-        article = q.pop(0) #Always getting the child that has been waiting the longest FIFO
+    while not stop_search:
+        article = q.get(0) #Always getting the child that has been waiting the longest FIFO
         links = get_links(article.article_header)
         add_links_to_tree(links, article, end_article, q)
     print('THREAD STOPPED')
