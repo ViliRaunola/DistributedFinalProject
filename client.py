@@ -1,5 +1,6 @@
 import xmlrpc.client
 import json
+import time
 
 
 hostname = 'localhost'
@@ -21,7 +22,7 @@ def menu():
 def start_search():
     start_article = input('Give the article name where to start the search: ')
     end_article = input('Give the article name to where to end the search: ')
-    print('')
+    print('Checking if both articles exists before starting the search... Please Stand by!')
     response_for_article_check = rpc.check_articles(start_article, end_article)
     json_response = json.loads(response_for_article_check)
 
@@ -32,7 +33,26 @@ def start_search():
         print('Please try different articles!')
         return False
 
-    rpc.shortest_path(start_article, end_article)
+    print('Starting the search!')
+    print('Searching....')
+    start = time.time()
+    response_for_path_search = rpc.shortest_path(start_article, end_article)
+    json_response = json.loads(response_for_path_search)
+
+    if json_response['success']:
+        print(f'Path found! Search took {time.time()-start}s') #Source for using time: https://stackoverflow.com/questions/3144898/python-question-about-time-spent
+        path = json_response['path']
+        path.reverse()
+        #print(json_response)
+        i = 0
+        for link in path:
+            print(f'{link} ', end='')
+            i = i + 1
+            if i < len(path):
+                print('-> ', end='')
+    else:
+        return False
+
 
     return True
 
