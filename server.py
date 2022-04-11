@@ -2,9 +2,15 @@ from xmlrpc.server import SimpleXMLRPCServer
 from socketserver import ThreadingMixIn
 import wikipediaapi #Source for using this library: https://pypi.org/project/Wikipedia-API/
 import json
+import queue
+import threading
+from concurrent.futures import ThreadPoolExecutor  #https://www.youtube.com/watch?v=BagTTT7l1pU
 
 hostname = 'localhost'
 portnumber = 3000
+MAX_LEVELS = 6 #Number of levels limiting the search three depth
+MAX_WORKERS = 5
+stop_search = False
 
 #Initializing wikipedia object and defining the language for the search
 wiki_wiki = wikipediaapi.Wikipedia('en') 
@@ -74,24 +80,45 @@ def get_links(parent_article):
     return links
 
 #Adding the found articles to a parent node    
-def add_links_to_tree(links, parent, end_article):
+def add_links_to_tree(links, parent, end_article, q):
+    global stop_search
     for title in links.keys():
         title_exists = wiki_wiki.page(title).exists()
         if title_exists:
             child = Node(title)
             parent.add_child(child)
+            q.put(child) #Adds the new child also to the queu
         #If one of the articles matches the end result a global flag is raised
         if title == end_article:
             stop_search = True
             break
+    
+
+def worker(end_article, q):
+    while stop_search:
+        article = q.pop(0) #Always getting the child that has been waiting the longest FIFO
+        links = get_links(article.article_header)
+        add_links_to_tree(links, article, end_article, q)
+
 
 #Function that handels the builindg of the search tree
 def create_tree(start_article, end_article):
+    q = queue.Queue()
+
     links = get_links(start_article)
-    
     root = Node(start_article)
 
-    add_links_to_tree(links, root, end_article)
+    #Adding the links from the start article to the tree
+    #                x      (0)
+    #              / | \
+    #             y  z  c   (1)
+    add_links_to_tree(links, root, end_article, q)
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        executor.map(worker)
+
+
+
 
     # for title in links.keys():
     #     links2 = get_links(title)
