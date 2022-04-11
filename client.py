@@ -2,6 +2,7 @@ import xmlrpc.client
 import json
 import time
 
+#!TODO ADD COMMENTS
 
 hostname = 'localhost'
 portnumber = 3000

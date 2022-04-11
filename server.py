@@ -226,7 +226,6 @@ def run_server(host=hostname, port=portnumber):
     server_addr = (host, port)
     server = SimpleThreadedXMLRPCServer(server_addr)
     
-    server.register_function(test, 'test')
     server.register_function(check_articles, 'check_articles')
     server.register_function(handle_search, 'shortest_path')
 
