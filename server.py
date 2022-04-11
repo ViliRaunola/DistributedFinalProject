@@ -6,11 +6,12 @@ import queue
 import threading
 from concurrent.futures import ThreadPoolExecutor  #https://www.youtube.com/watch?v=BagTTT7l1pU
 import requests
+import time
 
 hostname = 'localhost'
 portnumber = 3000
 MAX_LEVELS = 6 #Number of levels limiting the search three depth
-MAX_WORKERS = 2
+MAX_WORKERS = 30
 stop_search = False
 lock = threading.Lock()
 
@@ -34,18 +35,35 @@ class Node:
         self.parent = None
     
     
+    
     def add_child(self, child):
         child.parent = self
         self.children.append(child)
     
 
-    
-
 #https://www.youtube.com/watch?v=ipTWq6_2AGk
-def find_path(root, end_article):
+def find_path(found):
+    # queue = [root]
+    path = []
+    node = found.get(0)
+    # while queue:
+    #     node = queue.pop(0)
+    #     if node.parent:
+    #         pass
+    #         # path.append(node.parent.article_header) if node.parent.article_header not in path else path  #Source for adding to list if not in list: https://stackoverflow.com/questions/17370984/appending-an-id-to-a-list-if-not-already-present-in-a-string
+    #     if node.article_header == end_article:
+    #         break
+    #     #Making sure that children list is not empty
+    #     if node.children:
+    #         queue.extend(node.children)
     
+    path.append(node.article_header)
+    while node.parent:
+        path.append(node.parent.article_header)
+        node = node.parent
 
-    pass
+
+    return path
 
     
    
@@ -70,11 +88,11 @@ def check_article(searchterm):
     }
 
     response = session.get(url=url, params=params)
-    data = response.json()
 
-    #Check wether we found the thing that we were looking for based on the title of the first result
 
+    #Try catch for the exception when this type of tree is not returned meaning that there are no articles on that name
     try:
+        data = response.json()
         if data['query']['search'][0]['title'] == searchterm:
             return True
         else:
@@ -87,7 +105,7 @@ def check_article(searchterm):
 
 #function to check wether the end and start points exists.
 def check_articles(start_article, end_article):
-    
+
     # #Initializing wikipedia object and defining the language for the search
     # wiki_wiki = wikipediaapi.Wikipedia('en') 
 
@@ -116,6 +134,7 @@ def check_articles(start_article, end_article):
             'success': False,
             'message': 'End article not found'
         }
+
     return json.dumps(return_message)
 
 #Function to retreive the links of a article
@@ -135,10 +154,11 @@ def get_links(parent_article):
     "pllimit": "max",
     }
 
-    response = session.get(url=url, params=params)
-    data = response.json()
-    PAGES = data["query"]["pages"]
+    #Try catch if the api tries to slow us down
     try:
+        response = session.get(url=url, params=params)
+        data = response.json()
+        PAGES = data["query"]["pages"]
         for k, v in PAGES.items():
             for l in v["links"]:
                 links.append(l['title'])
@@ -147,37 +167,49 @@ def get_links(parent_article):
     except:
         return []
 
-    
-
 #Adding the found articles to a parent node    
-def add_links_to_tree(links, parent, end_article, q):
+def add_links_to_tree(links, parent, end_article, q, found):
     global stop_search
     
     for title in links:
         #title_exists = wiki_wiki.page(title).exists()
         #title_exists = check_article(title)
         #if title_exists:
+        
         child = Node(title)
+        
         parent.add_child(child)
+        
         q.put(child) #Adds the new child also to the queue
         #If one of the articles matches the end result a global flag is raised
         if title == end_article:
+            found.put(child)
             stop_search = True
             break
     
 
-def worker(end_article, q):
+def worker(end_article, q, found):
+    print('THREAD STARTED')
     while not stop_search:
-        article = q.get(0) #Always getting the child that has been waiting the longest FIFO
-        links = get_links(article.article_header)
-        add_links_to_tree(links, article, end_article, q)
+        try:
+            article = q.get(0) #Always getting the child that has been waiting the longest FIFO
+            links = get_links(article.article_header)
+            
+            #lock.acquire()
+            add_links_to_tree(links, article, end_article, q, found)
+            #lock.release()
+        
+        except queue.Empty:
+            print('Queue is empty sleeping...')
+            time.sleep(0.1) 
     print('THREAD STOPPED')
     
 
 
 #Function that handels the builindg of the search tree
-def create_tree(start_article, end_article):
+def handle_search(start_article, end_article):
     q = queue.Queue()
+    found = queue.Queue()
 
     links = get_links(start_article)
     root = Node(start_article)
@@ -186,26 +218,30 @@ def create_tree(start_article, end_article):
     #                x      (0)
     #              / | \
     #             y  z  c   (1)
-    add_links_to_tree(links, root, end_article, q)
-
-    # with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-    #     executor.map(worker, end_article, q)
+    add_links_to_tree(links, root, end_article, q, found)
 
     threads = []
 
     for _ in range(MAX_WORKERS):
-        thread = threading.Thread(target=worker, args=(end_article, q,))
+        thread = threading.Thread(target=worker, args=(end_article, q, found))
         thread.start()
         threads.append(thread)
 
     for thread in threads:
         thread.join()
 
-    find_path(root, end_article)
+    path = find_path(found)
 
-    
+    return_message = {
+        'success': True,
+        'path': path,
+    }
 
-    return 0
+    print('path is: ')
+    print(path)
+
+    return json.dumps(return_message)
+
 
 
 
@@ -215,7 +251,7 @@ def run_server(host=hostname, port=portnumber):
     
     server.register_function(test, 'test')
     server.register_function(check_articles, 'check_articles')
-    server.register_function(create_tree, 'shortest_path')
+    server.register_function(handle_search, 'shortest_path')
 
     print('Server started on own thread')
     print(f'Server is listening on host {host} port {port}')
