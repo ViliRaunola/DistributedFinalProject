@@ -99,6 +99,8 @@ def worker(end_article, q):
         article = q.pop(0) #Always getting the child that has been waiting the longest FIFO
         links = get_links(article.article_header)
         add_links_to_tree(links, article, end_article, q)
+    print('THREAD STOPPED')
+    
 
 
 #Function that handels the builindg of the search tree
@@ -114,9 +116,18 @@ def create_tree(start_article, end_article):
     #             y  z  c   (1)
     add_links_to_tree(links, root, end_article, q)
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        executor.map(worker)
+    # with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    #     executor.map(worker, end_article, q)
 
+    threads = []
+
+    for _ in range(MAX_WORKERS):
+        thread = threading.Thread(target=worker, args=(end_article, q,))
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
 
 
 
