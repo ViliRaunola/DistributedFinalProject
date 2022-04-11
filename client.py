@@ -52,6 +52,7 @@ def start_search():
             if i < len(path):
                 print('-> ', end='')
     else:
+        print(json_response['message'])
         return False
 
 

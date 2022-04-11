@@ -9,8 +9,11 @@ import time
 
 hostname = 'localhost'
 portnumber = 3000
-MAX_WORKERS = 80 #Number of threads that are created
+MAX_WORKERS = 20 #Number of threads that are created
+MAX_DEPTH = 2 #Variable to check the depth of the search when to stop
 stop_search = False #Global flag that is used to control all of the working threads
+max_detph = False #Global flag raised if the depth was reached
+allow_depth_check = False #Global flag to allow the depth check. Is cpu intensive so don't really want to be used
 lock = threading.Lock()
 
 
@@ -46,6 +49,19 @@ def find_path(found):
         node = node.parent
 
     return path
+
+#Function to get the nodes depth in the tree
+def get_depth(node):
+    path = [] #Stores the path from end to start
+    path.append(node.article_header) #Adding the child node name to the
+    #Traversing back to the parent
+    while node.parent:
+        path.append(node.parent.article_header) #Adding the parent's name to the path
+        node = node.parent
+
+    depth = len(path)
+
+    return depth
 
 
 
@@ -136,8 +152,15 @@ def get_links(parent_article):
 
 #Adding the found articles to a parent node    
 def add_links_to_tree(links, parent, end_article, q, found):
-    global stop_search
+    global stop_search, max_detph
     
+    #Check if the depth cheking is allwed or not
+    if allow_depth_check:
+        depth = get_depth(parent)
+        if MAX_DEPTH < depth:
+            stop_search = True
+            max_detph = True
+
     for title in links:        
         child = Node(title) #Creating the node
         parent.add_child(child) #Adding the node to its parent
@@ -171,7 +194,7 @@ def worker(end_article, q, found):
 def handle_search(start_article, end_article):
     #Adding a lock for this fuction. Otherwise running this with another RPC thread would couse problems
     with lock:
-        global stop_search
+        global stop_search, max_detph
         links = [] #Array for links that is needed for creating the root node
         q = queue.Queue()   #Queue that keeps track of the child nodes that need to be processed next. Child nodes are added breadth first
         found = queue.Queue()   #Queue that will be used to transfer the child node that has the end article
@@ -199,6 +222,29 @@ def handle_search(start_article, end_article):
             thread.join()
         print('All threads closed')
 
+
+        #If the max_depth flag was raised
+        if max_detph:
+            #Clearing the queues when exiting the thread: https://stackoverflow.com/questions/6517953/clear-all-items-from-the-queue
+            with q.mutex:
+                q.queue.clear()
+            
+            with found.mutex:
+                found.queue.clear()
+        
+            #Resetting the global flags
+            stop_search = False 
+            max_detph = False
+
+            return_message = {
+                'success': False,
+                'message': f'Maximum depth reached of {MAX_DEPTH}',
+            }
+
+            return json.dumps(return_message)
+
+            
+
         #Getting the path between the articles
         path = find_path(found)
 
@@ -214,8 +260,9 @@ def handle_search(start_article, end_article):
         with found.mutex:
             found.queue.clear()
         
-        #Resetting the global flag
+        #Resetting the global flags
         stop_search = False 
+        max_detph = False
 
         return json.dumps(return_message)
 
