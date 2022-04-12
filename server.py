@@ -1,4 +1,3 @@
-from pickle import FALSE
 from xmlrpc.server import SimpleXMLRPCServer
 from socketserver import ThreadingMixIn
 import json
@@ -9,7 +8,7 @@ import time
 
 hostname = 'localhost'
 portnumber = 3000
-MAX_WORKERS = 20 #Number of threads that are created
+MAX_WORKERS = 60 #Number of threads that are created
 MAX_DEPTH = 2 #Variable to check the depth of the search when to stop
 stop_search = False #Global flag that is used to control all of the working threads
 max_detph = False #Global flag raised if the depth was reached
@@ -87,7 +86,9 @@ def check_article(searchterm):
         else:
             #Nothing found, returning empty
             return False
-    except:
+    except Exception as e:
+        print(e)
+        print('Error in searching the article')
         return False
     
 
@@ -138,16 +139,25 @@ def get_links(parent_article):
 
     #Try catch if the api tries to slow us down
     #SOURCE: https://www.mediawiki.org/wiki/API:Links
+
+    #try:
+    response = session.get(url=url, params=params)
+    # except Exception as e:
+    #     print('Fetching links has encoutered an error')
+    #     print(e)
+
     try:
-        response = session.get(url=url, params=params)
+        
         data = response.json()
-        PAGES = data["query"]["pages"]
-        for k, v in PAGES.items():
+        pages = data["query"]["pages"]
+        for k, v in pages.items():
             for l in v["links"]:
                 links.append(l['title'])
                 #print(l['title'])
         return links
-    except:
+    except Exception as e:
+        #print(e)
+        #print(f'No links found on article: {parent_article}')
         return []
 
 #Adding the found articles to a parent node    
@@ -155,11 +165,11 @@ def add_links_to_tree(links, parent, end_article, q, found):
     global stop_search, max_detph
     
     #Check if the depth cheking is allwed or not
-    if allow_depth_check:
-        depth = get_depth(parent)
-        if MAX_DEPTH < depth:
-            stop_search = True
-            max_detph = True
+    # if allow_depth_check:
+    #     depth = get_depth(parent)
+    #     if MAX_DEPTH < depth:
+    #         stop_search = True
+    #         max_detph = True
 
     for title in links:        
         child = Node(title) #Creating the node

@@ -17,6 +17,7 @@ def get_links(parent_article):
 
     response = session.get(url=url, params=params)
     data = response.json()
+    print(data)
     PAGES = data["query"]["pages"]
     try:
         for k, v in PAGES.items():
@@ -28,7 +29,7 @@ def get_links(parent_article):
         return []
 
 def main():
-    links = get_links('Elizabeth II')
+    links = get_links('Animal')
     for link in links:
         print(link)
 
