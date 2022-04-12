@@ -8,7 +8,7 @@ import time
 
 hostname = 'localhost'
 portnumber = 3000
-MAX_WORKERS = 60 #Number of threads that are created
+MAX_WORKERS = 30 #Number of threads that are created
 MAX_DEPTH = 2 #Variable to check the depth of the search when to stop
 stop_search = False #Global flag that is used to control all of the working threads
 max_detph = False #Global flag raised if the depth was reached
@@ -31,10 +31,13 @@ class Node:
         self.article_header = article_header #Article/ link name
         self.children = []  #All of the children nodes
         self.parent = None #Parent of this node
+        self.depth = 0 #Node depth on the tree
     #Function to add children
     def add_child(self, child):
         child.parent = self #When calling as parent.add_child(child) self refers to parent --> aka childs parent comes the parent :D
         self.children.append(child) #Adding the child to the parent's children list
+        child.depth = self.depth + 1 #Child's level is one more that the parents
+
     
 
 #Uses the found child article to reverse the path
@@ -120,6 +123,22 @@ def check_articles(start_article, end_article):
 
         return json.dumps(return_message)
 
+def get_links_more(url, params, session):
+    links = []
+
+    while True:
+        response = session.get(url=url, params=params)
+        data = response.json()
+        pages = data["query"]["pages"]
+        try:
+            for k, v in pages.items():
+                for l in v["links"]:
+                    links.append(l['title'])
+            params['plcontinue'] = data['continue']['plcontinue']
+        except Exception:
+            break
+    return links
+
 #Function to retreive the links of a article, is mainly copy pasted from wikipedias documentation!
 #SOURCE: https://www.mediawiki.org/wiki/API:Links
 def get_links(parent_article):
@@ -150,15 +169,24 @@ def get_links(parent_article):
         
         data = response.json()
         pages = data["query"]["pages"]
+
         for k, v in pages.items():
             for l in v["links"]:
-                links.append(l['title'])
-                #print(l['title'])
+                if(l["ns"] == 0): #Source for removing empty links https://stackoverflow.com/questions/40579942/what-do-the-parameters-in-wikipedia-api-response-mean
+                    links.append(l['title'])
+                    #print(l['title'])
+
+        if 'continue' in data:
+            if 'plcontinue' in data['continue']:
+                continue_parameter = data['continue']['plcontinue']
+                params['plcontinue'] = continue_parameter
+                links.extend(get_links_more(url, params, session))
+                
         return links
-    except Exception as e:
-        #print(e)
-        #print(f'No links found on article: {parent_article}')
+    except KeyError:
         return []
+    except json.decoder.JSONDecodeError as e: #Error when the Wikipedia API tries to block us
+        return ['--1']
 
 #Adding the found articles to a parent node    
 def add_links_to_tree(links, parent, end_article, q, found):
@@ -177,6 +205,7 @@ def add_links_to_tree(links, parent, end_article, q, found):
         
         q.put(child) #Adds the new child also to the queue
         #If one of the articles matches the end result a global flag is raised and threads all stopped
+        #print(f'Depth is now: {child.depth}')
         if title == end_article:
             found.put(child) #Adding the child to the found queue where it is retreived for path analysis
             stop_search = True #Raising the stop flag
@@ -190,7 +219,14 @@ def worker(end_article, q, found):
     while not stop_search:
         try:
             article = q.get(0) #Always getting the child that has been waiting the longest FIFO
+            
             links = get_links(article.article_header)
+            if len(links) > 0:
+                #If the Wikipedia API blocked us we didn't get any info from that child so it must be put back to the queue
+                #This means that the breadth first search is compomised!!!!
+                if links[0] == '--1': 
+                    q.put(article)
+                    continue
             add_links_to_tree(links, article, end_article, q, found)
         #Incase we empty the queue due to too many workers/ slow api resulting in no links
         except queue.Empty:
@@ -208,7 +244,6 @@ def handle_search(start_article, end_article):
         links = [] #Array for links that is needed for creating the root node
         q = queue.Queue()   #Queue that keeps track of the child nodes that need to be processed next. Child nodes are added breadth first
         found = queue.Queue()   #Queue that will be used to transfer the child node that has the end article
-
         #Adding the links from the start article to the tree as a root
         #                x      (0)  <-- root
         #              / | \
@@ -277,6 +312,8 @@ def handle_search(start_article, end_article):
         return json.dumps(return_message)
 
 
+#Sources for multuthreded rpc server: https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
+# https://stackoverflow.com/questions/5033222/is-simplexmlrpcserver-single-threaded
 
 
 def run_server(host=hostname, port=portnumber):

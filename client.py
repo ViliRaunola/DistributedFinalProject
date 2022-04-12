@@ -41,7 +41,7 @@ def start_search():
     json_response = json.loads(response_for_path_search)
 
     if json_response['success']:
-        print(f'Path found! Search took {time.time()-start}s') #Source for using time: https://stackoverflow.com/questions/3144898/python-question-about-time-spent
+        print(f'Path found! Search took {round(time.time()-start)} s') #Source for using time: https://stackoverflow.com/questions/3144898/python-question-about-time-spent
         path = json_response['path']
         path.reverse()
         #print(json_response)

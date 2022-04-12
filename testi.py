@@ -1,4 +1,25 @@
+
 import requests
+
+
+def get_links_more(url, params, session):
+    links = []
+
+    while True:
+        response = session.get(url=url, params=params)
+        data = response.json()
+        print(data)
+        PAGES = data["query"]["pages"]
+        try:
+            for k, v in PAGES.items():
+                for l in v["links"]:
+                    links.append(l['title'])
+            params['plcontinue'] = data['continue']['plcontinue']
+        except KeyError:
+            break
+    return links
+
+
 
 def get_links(parent_article):
     
@@ -18,19 +39,26 @@ def get_links(parent_article):
     response = session.get(url=url, params=params)
     data = response.json()
     print(data)
-    PAGES = data["query"]["pages"]
+    pages = data["query"]["pages"]
     try:
-        for k, v in PAGES.items():
+        for k, v in pages.items():
             for l in v["links"]:
                 links.append(l['title'])
                 #print(l['title'])
+        if 'continue' in data:
+            if 'plcontinue' in data['continue']:
+                continue_parameter = data['continue']['plcontinue']
+                params['plcontinue'] = continue_parameter
+                links.extend(get_links_more(url, params, session))
+
         return links
-    except:
+    except KeyError:
         return []
 
 def main():
-    links = get_links('Animal')
+    links = get_links('Mämmi')
     for link in links:
         print(link)
+    print(len(links))
 
 main()
