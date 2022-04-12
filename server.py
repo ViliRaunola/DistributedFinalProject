@@ -8,12 +8,13 @@ import time
 
 hostname = 'localhost'
 portnumber = 3000
-MAX_WORKERS = 30 #Number of threads that are created
+MAX_WORKERS = 10 #Number of threads that are created
 MAX_DEPTH = 2 #Variable to check the depth of the search when to stop
 stop_search = False #Global flag that is used to control all of the working threads
 max_detph = False #Global flag raised if the depth was reached
 allow_depth_check = False #Global flag to allow the depth check. Is cpu intensive so don't really want to be used
 lock = threading.Lock()
+lock3 = threading.Lock()
 
 
 #The Class SimpleThreadedXMLRPCServer and run_server function is heavily inspired by these threads: https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
@@ -99,7 +100,7 @@ def check_article(searchterm):
 #Function to check wether the end and start points exists.
 def check_articles(start_article, end_article):
     #Is locked so only one client can use it once
-    with lock:
+    with lock3:
 
         start_article_exists = check_article(start_article)
         end_article_exists = check_article(end_article)
@@ -130,13 +131,16 @@ def get_links_more(url, params, session):
         response = session.get(url=url, params=params)
         data = response.json()
         pages = data["query"]["pages"]
-        try:
-            for k, v in pages.items():
-                for l in v["links"]:
+        for k, v in pages.items():
+            for l in v["links"]:
+                if(l["ns"] == 0):
                     links.append(l['title'])
-            params['plcontinue'] = data['continue']['plcontinue']
-        except Exception:
+        if 'continue' in data:
+                if 'plcontinue' in data['continue']:
+                    params['plcontinue'] = data['continue']['plcontinue']
+        else:
             break
+        
     return links
 
 #Function to retreive the links of a article, is mainly copy pasted from wikipedias documentation!
@@ -183,8 +187,8 @@ def get_links(parent_article):
                 links.extend(get_links_more(url, params, session))
                 
         return links
-    except KeyError:
-        return []
+    except KeyError as e:
+        return ['--1']
     except json.decoder.JSONDecodeError as e: #Error when the Wikipedia API tries to block us
         return ['--1']
 
@@ -199,6 +203,7 @@ def add_links_to_tree(links, parent, end_article, q, found):
     #         stop_search = True
     #         max_detph = True
 
+    
     for title in links:        
         child = Node(title) #Creating the node
         parent.add_child(child) #Adding the node to its parent
@@ -211,6 +216,7 @@ def add_links_to_tree(links, parent, end_article, q, found):
             stop_search = True #Raising the stop flag
             break
     
+    
 
 #The main worker thread
 #Processes one child node at once. Gets all the links it has and adds the links as childs back to itself
@@ -219,15 +225,16 @@ def worker(end_article, q, found):
     while not stop_search:
         try:
             article = q.get(0) #Always getting the child that has been waiting the longest FIFO
-            
             links = get_links(article.article_header)
             if len(links) > 0:
                 #If the Wikipedia API blocked us we didn't get any info from that child so it must be put back to the queue
-                #This means that the breadth first search is compomised!!!!
+                #This means that the breadth first search is compromised!!!!
                 if links[0] == '--1': 
                     q.put(article)
                     continue
+            
             add_links_to_tree(links, article, end_article, q, found)
+            
         #Incase we empty the queue due to too many workers/ slow api resulting in no links
         except queue.Empty:
             print('Queue is empty sleeping...')
@@ -244,6 +251,7 @@ def handle_search(start_article, end_article):
         links = [] #Array for links that is needed for creating the root node
         q = queue.Queue()   #Queue that keeps track of the child nodes that need to be processed next. Child nodes are added breadth first
         found = queue.Queue()   #Queue that will be used to transfer the child node that has the end article
+        
         #Adding the links from the start article to the tree as a root
         #                x      (0)  <-- root
         #              / | \

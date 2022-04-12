@@ -10,12 +10,17 @@ def get_links_more(url, params, session):
         data = response.json()
         print(data)
         PAGES = data["query"]["pages"]
-        try:
-            for k, v in PAGES.items():
-                for l in v["links"]:
+        
+        for k, v in PAGES.items():
+            for l in v["links"]:
+                if(l["ns"] == 0):
                     links.append(l['title'])
-            params['plcontinue'] = data['continue']['plcontinue']
-        except KeyError:
+
+        
+        if 'continue' in data:
+                if 'plcontinue' in data['continue']:
+                    params['plcontinue'] = data['continue']['plcontinue']
+        else:
             break
     return links
 
@@ -43,7 +48,8 @@ def get_links(parent_article):
     try:
         for k, v in pages.items():
             for l in v["links"]:
-                links.append(l['title'])
+                if(l["ns"] == 0):
+                    links.append(l['title'])
                 #print(l['title'])
         if 'continue' in data:
             if 'plcontinue' in data['continue']:
@@ -56,7 +62,7 @@ def get_links(parent_article):
         return []
 
 def main():
-    links = get_links('Mämmi')
+    links = get_links('Jesus')
     for link in links:
         print(link)
     print(len(links))
