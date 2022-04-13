@@ -14,7 +14,7 @@ To run the code:
   client.py
   ```
     
-Excpected output for example route between Mämmi and Elon Musk:
+Excpected output for example route between Mämmi and Death:
 ```console
 Path found! Search took 4 s
 Mämmi -> Birch bark -> Creosote -> Death 
