@@ -6,19 +6,17 @@ The main idea in this project was to implement a general search tree. The search
 
 To run the code:
   1. Start the server
-    
-    ```
-     server.py
-     ```  
+ ```
+ server.py
+ ```
   2. Start the client
-    
-    ```
-    client.py
-    ```
+  ```
+  client.py
+  ```
     
 Excpected output for example route between Mämmi and Elon Musk:
 ```console
-Path found! Search took 50 s
-Mämmi -> Latin -> United States Space Force -> Elon Musk 
-Mämmi is 4 clicks away from Elon Musk
+Path found! Search took 4 s
+Mämmi -> Birch bark -> Afghanistan -> Fox 
+Mämmi is 4 clicks away from Fox
 ```
