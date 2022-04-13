@@ -2,7 +2,7 @@
 
 This was done as a final assignment on LUT course called Distributed Systems
 
-The main idea in this project was to implement a general search tree. The search tree is built by working threads. Once the article that is being searched is found, building the tree is stopped. After this we have the last leaf that is the article that we were looking for. Now we can backtrack the path through the tree thus giving us the links from start to finish. Building the tree is done one layer at a time.
+The task was to build a distributed system that finds the shortest path between two Wikipedia articles. More detailed documentation in the repository as PDF-file.
 
 The RPC server can handle multiple clients at once. You can start a longer search on one client and an other client can still make their own calls to the server and get response before the other one finishes.
 
