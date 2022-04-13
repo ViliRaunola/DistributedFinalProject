@@ -8,13 +8,10 @@ import time
 
 hostname = 'localhost'
 portnumber = 3000
-MAX_WORKERS = 20 #Number of threads that are created
-MAX_DEPTH = 6 #Variable to check the depth of the search when to stop
-STOP_SEARCH = False #Global flag that is used to control all of the working threads
-MAX_DEPTH_FLAG = False #Global flag raised if the depth was reached
+MAX_WORKERS = 10 #Number of threads that are created
+MAX_DEPTH = 7 #Variable to check the depth of the search when to stop
 ALLOW_DEPTH_CHECK = True #Global flag to allow the depth check. Is cpu intensive so don't really want to be used
 lock = threading.Lock()
-lock3 = threading.Lock()
 
 
 #The Class SimpleThreadedXMLRPCServer and run_server function is heavily inspired by these threads: 
@@ -101,7 +98,7 @@ def check_article(searchterm):
 #Function to check wether the end and start points exists.
 def check_articles(start_article, end_article):
     #Is locked so only one client can use it once
-    with lock3:
+    with lock:
 
         start_article_exists = check_article(start_article)
         end_article_exists = check_article(end_article)
@@ -190,14 +187,13 @@ def get_links(parent_article):
         return ['--1']
 
 #Adding the found articles to a parent node    
-def add_links_to_tree(links, parent, end_article, q, found):
-    global STOP_SEARCH, MAX_DEPTH_FLAG
+def add_links_to_tree(links, parent, end_article, q, found, stop, max_depth):
     
     #Check if the depth cheking is allwed or not
     if ALLOW_DEPTH_CHECK:
         if MAX_DEPTH < parent.depth:
-            STOP_SEARCH = True
-            MAX_DEPTH_FLAG = True
+            stop.put(1) #Stopping the threads
+            max_depth.put(1) #Showing that the max thread is reached
 
     
     for title in links:        
@@ -209,16 +205,18 @@ def add_links_to_tree(links, parent, end_article, q, found):
         #print(f'Depth is now: {child.depth}')
         if title == end_article:
             found.put(child) #Adding the child to the found queue where it is retreived for path analysis
-            STOP_SEARCH = True #Raising the stop flag
+            #Raising the stop flag
+            stop.put(1)
             break
     
     
 
 #The main worker thread
 #Processes one child node at once. Gets all the links it has and adds the links as childs back to itself
-def worker(end_article, q, found):
+def worker(end_article, q, found, stop, max_depth):
     #Will get a child node from the queue until a stop flag is raised indicating that the article is found
-    while not STOP_SEARCH:
+    #while not STOP_SEARCH:
+    while stop.empty():
         try:
             article = q.get(0) #Always getting the child that has been waiting the longest FIFO
             links = get_links(article.article_header)
@@ -229,7 +227,7 @@ def worker(end_article, q, found):
                     q.put(article)
                     continue
             
-            add_links_to_tree(links, article, end_article, q, found)
+            add_links_to_tree(links, article, end_article, q, found, stop, max_depth)
             
         #Incase we empty the queue due to too many workers/ slow api resulting in no links
         except queue.Empty:
@@ -242,78 +240,83 @@ def worker(end_article, q, found):
 #Function that handels the working threads
 def handle_search(start_article, end_article):
     #Adding a lock for this fuction. Otherwise running this with another RPC thread would couse problems
-    with lock:
-        global STOP_SEARCH, MAX_DEPTH_FLAG
-        links = [] #Array for links that is needed for creating the root node
-        q = queue.Queue()   #Queue that keeps track of the child nodes that need to be processed next. Child nodes are added breadth first
-        found = queue.Queue()   #Queue that will be used to transfer the child node that has the end article
-        
-        #Adding the links from the start article to the tree as a root
-        #                x      (0)  <-- root
-        #              / | \
-        #             y  z  c   (1)
-        links = get_links(start_article)
-        root = Node(start_article)
-        add_links_to_tree(links, root, end_article, q, found)
+    
+    links = [] #Array for links that is needed for creating the root node
+    q = queue.Queue()   #Queue that keeps track of the child nodes that need to be processed next. Child nodes are added breadth first
+    found = queue.Queue()   #Queue that will be used to transfer the child node that has the end article
+    stop = queue.Queue()    #Global flag raised if the search should be stopped
+    max_depth = queue.Queue() #Global flag raised if the depth was reached
+    
+    #Adding the links from the start article to the tree as a root
+    #                x      (0)  <-- root
+    #              / | \
+    #             y  z  c   (1)
+    links = get_links(start_article)
+    root = Node(start_article)
+    add_links_to_tree(links, root, end_article, q, found, stop, max_depth)
 
-        threads = [] #Array that keeps track of the created threads
+    threads = [] #Array that keeps track of the created threads
 
-        #Creating a fixed amount of working threads
-        #Source: https://stackoverflow.com/questions/55529319/how-to-create-multiple-threads-dynamically-in-python
-        #Source for using _ in loop: https://stackoverflow.com/questions/66425508/what-is-the-meaning-of-for-in-range
-        for _ in range(MAX_WORKERS):
-            thread = threading.Thread(target=worker, args=(end_article, q, found))
-            thread.start()
-            threads.append(thread)
-        print(f'All {MAX_WORKERS} threads started!')
-        #Waiting for all of the threads to finish before continuing. Same source as creating threads
-        for thread in threads:
-            thread.join()
-        print('All threads closed')
+    #Creating a fixed amount of working threads
+    #Source: https://stackoverflow.com/questions/55529319/how-to-create-multiple-threads-dynamically-in-python
+    #Source for using _ in loop: https://stackoverflow.com/questions/66425508/what-is-the-meaning-of-for-in-range
+    for _ in range(MAX_WORKERS):
+        thread = threading.Thread(target=worker, args=(end_article, q, found, stop, max_depth,))
+        thread.start()
+        threads.append(thread)
+    print(f'All {MAX_WORKERS} threads started!')
+    #Waiting for all of the threads to finish before continuing. Same source as creating threads
+    for thread in threads:
+        thread.join()
+    print('All threads closed')
 
 
-        #If the max_depth flag was raised
-        if MAX_DEPTH_FLAG:
-            #Clearing the queues when exiting the thread: https://stackoverflow.com/questions/6517953/clear-all-items-from-the-queue
-            with q.mutex:
-                q.queue.clear()
-            
-            with found.mutex:
-                found.queue.clear()
-        
-            #Resetting the global flags
-            STOP_SEARCH = False 
-            MAX_DEPTH_FLAG = False
-
-            return_message = {
-                'success': False,
-                'message': f'Maximum depth reached of {MAX_DEPTH}',
-            }
-
-            return json.dumps(return_message)
-
-            
-
-        #Getting the path between the articles
-        path = find_path(found)
-
-        return_message = {
-            'success': True,
-            'path': path,
-        }
-
-        #Clearing the queues when exiting the thread: https://stackoverflow.com/questions/6517953/clear-all-items-from-the-queue
+    #If the max_depth flag was raised
+    if not max_depth.empty():
+        #Clearing the queues when finishing: https://stackoverflow.com/questions/6517953/clear-all-items-from-the-queue
         with q.mutex:
             q.queue.clear()
         
         with found.mutex:
             found.queue.clear()
-        
-        #Resetting the global flags
-        STOP_SEARCH = False 
-        MAX_DEPTH_FLAG = False
 
+        with stop.mutex:
+            stop.queue.clear()
+
+        with max_depth.mutex:
+            max_depth.queue.clear()
+
+        return_message = {
+            'success': False,
+            'message': f'Maximum depth reached of {MAX_DEPTH}',
+        }
         return json.dumps(return_message)
+
+            
+
+    #Getting the path between the articles
+    path = find_path(found)
+
+    return_message = {
+        'success': True,
+        'path': path,
+    }
+
+    #Clearing the queues when finishing: https://stackoverflow.com/questions/6517953/clear-all-items-from-the-queue
+    with q.mutex:
+        q.queue.clear()
+    
+    with found.mutex:
+        found.queue.clear()
+    
+    with stop.mutex:
+        stop.queue.clear()
+    
+    with max_depth.mutex:
+        max_depth.queue.clear()
+    
+
+    return json.dumps(return_message)
 
 
 #Sources for multithreded rpc server: https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
