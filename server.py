@@ -8,7 +8,7 @@ import time
 
 hostname = 'localhost'
 portnumber = 3000
-MAX_WORKERS = 10 #Number of threads that are created
+MAX_WORKERS = 20 #Number of threads that are created
 MAX_DEPTH = 2 #Variable to check the depth of the search when to stop
 stop_search = False #Global flag that is used to control all of the working threads
 max_detph = False #Global flag raised if the depth was reached
@@ -124,9 +124,8 @@ def check_articles(start_article, end_article):
 
         return json.dumps(return_message)
 
-def get_links_more(url, params, session):
-    links = []
-
+def get_links_more(url, params, session, links):
+    #TODO kokeile vielä try exceptin kanssa?
     while True:
         response = session.get(url=url, params=params)
         data = response.json()
@@ -141,7 +140,6 @@ def get_links_more(url, params, session):
         else:
             break
         
-    return links
 
 #Function to retreive the links of a article, is mainly copy pasted from wikipedias documentation!
 #SOURCE: https://www.mediawiki.org/wiki/API:Links
@@ -163,14 +161,9 @@ def get_links(parent_article):
     #Try catch if the api tries to slow us down
     #SOURCE: https://www.mediawiki.org/wiki/API:Links
 
-    #try:
     response = session.get(url=url, params=params)
-    # except Exception as e:
-    #     print('Fetching links has encoutered an error')
-    #     print(e)
-
+    
     try:
-        
         data = response.json()
         pages = data["query"]["pages"]
 
@@ -184,7 +177,7 @@ def get_links(parent_article):
             if 'plcontinue' in data['continue']:
                 continue_parameter = data['continue']['plcontinue']
                 params['plcontinue'] = continue_parameter
-                links.extend(get_links_more(url, params, session))
+                get_links_more(url, params, session, links)
                 
         return links
     except KeyError as e:
@@ -269,7 +262,7 @@ def handle_search(start_article, end_article):
             thread = threading.Thread(target=worker, args=(end_article, q, found))
             thread.start()
             threads.append(thread)
-        print('All threads started!')
+        print(f'All {MAX_WORKERS} threads started!')
         #Waiting for all of the threads to finish before continuing. Same source as creating threads
         for thread in threads:
             thread.join()

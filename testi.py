@@ -2,8 +2,7 @@
 import requests
 
 
-def get_links_more(url, params, session):
-    links = []
+def get_links_more(url, params, session, links):
 
     while True:
         response = session.get(url=url, params=params)
@@ -55,7 +54,7 @@ def get_links(parent_article):
             if 'plcontinue' in data['continue']:
                 continue_parameter = data['continue']['plcontinue']
                 params['plcontinue'] = continue_parameter
-                links.extend(get_links_more(url, params, session))
+                get_links_more(url, params, session, links)
 
         return links
     except KeyError:
