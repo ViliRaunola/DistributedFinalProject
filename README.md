@@ -16,7 +16,7 @@ To run the code:
     
 Excpected output for example route between Mämmi and Elon Musk:
 ```console
-Path found! Search took 3 s
-Mämmi -> Birch bark -> Afghanistan -> Fox 
-Mämmi is 4 clicks away from Fox
+Path found! Search took 4 s
+Mämmi -> Birch bark -> Creosote -> Death 
+Mämmi is 3 clicks away from Death
 ```
