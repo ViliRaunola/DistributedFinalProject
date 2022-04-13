@@ -17,6 +17,6 @@ To run the code:
 Excpected output for example route between Mämmi and Death:
 ```console
 Path found! Search took 4 s
-Mämmi -> Birch bark -> Creosote -> Death 
-Mämmi is 3 clicks away from Death
+Mämmi -> Birch bark -> Creosote -> Death
+Death is 3 clicks away from Mämmi
 ```
