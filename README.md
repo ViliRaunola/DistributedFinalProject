@@ -22,3 +22,7 @@ Path found! Search took 4 s
 Mämmi -> Birch bark -> Creosote -> Death
 Death is 3 clicks away from Mämmi
 ```
+Link for a YouTube-video that show the execution and general structure of the system:
+```link
+https://youtu.be/BWgY070F2Z8
+```
