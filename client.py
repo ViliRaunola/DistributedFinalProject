@@ -2,11 +2,10 @@ import xmlrpc.client
 import json
 import time
 
-#!TODO ADD COMMENTS
-
 hostname = 'localhost'
 portnumber = 3000
 
+#Source for connecting to the rpc server: https://docs.python.org/3/library/xmlrpc.client.html
 #Connecting to the server
 rpc = xmlrpc.client.ServerProxy(f'http://{hostname}:{portnumber}')
 
@@ -37,20 +36,22 @@ def start_search():
     print('Starting the search!')
     print('Searching....')
     start = time.time()
+    #Calling the shortest path fuction on RPC server. Returns a list containing the links between the articles
     response_for_path_search = rpc.shortest_path(start_article, end_article)
     json_response = json.loads(response_for_path_search)
 
     if json_response['success']:
         print(f'Path found! Search took {round(time.time()-start)} s') #Source for using time: https://stackoverflow.com/questions/3144898/python-question-about-time-spent
         path = json_response['path']
-        path.reverse()
-        #print(json_response)
+        path.reverse() #Reversing the list
         i = 0
+        #Displaying the path
         for link in path:
             print(f'{link} ', end='')
             i = i + 1
             if i < len(path):
                 print('-> ', end='')
+            print(f'{start_article} is {i} clicks away from {end_article}')
     else:
         print(json_response['message'])
         return False

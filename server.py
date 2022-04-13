@@ -9,10 +9,10 @@ import time
 hostname = 'localhost'
 portnumber = 3000
 MAX_WORKERS = 20 #Number of threads that are created
-MAX_DEPTH = 2 #Variable to check the depth of the search when to stop
-stop_search = False #Global flag that is used to control all of the working threads
-max_detph = False #Global flag raised if the depth was reached
-allow_depth_check = False #Global flag to allow the depth check. Is cpu intensive so don't really want to be used
+MAX_DEPTH = 6 #Variable to check the depth of the search when to stop
+STOP_SEARCH = False #Global flag that is used to control all of the working threads
+MAX_DEPTH_FLAG = False #Global flag raised if the depth was reached
+ALLOW_DEPTH_CHECK = True #Global flag to allow the depth check. Is cpu intensive so don't really want to be used
 lock = threading.Lock()
 lock3 = threading.Lock()
 
@@ -124,8 +124,10 @@ def check_articles(start_article, end_article):
 
         return json.dumps(return_message)
 
+
+#SOURCE: https://www.mediawiki.org/wiki/API:Links
 def get_links_more(url, params, session, links):
-    #TODO kokeile vielä try exceptin kanssa?
+    
     while True:
         response = session.get(url=url, params=params)
         data = response.json()
@@ -187,14 +189,13 @@ def get_links(parent_article):
 
 #Adding the found articles to a parent node    
 def add_links_to_tree(links, parent, end_article, q, found):
-    global stop_search, max_detph
+    global STOP_SEARCH, MAX_DEPTH_FLAG
     
     #Check if the depth cheking is allwed or not
-    # if allow_depth_check:
-    #     depth = get_depth(parent)
-    #     if MAX_DEPTH < depth:
-    #         stop_search = True
-    #         max_detph = True
+    if ALLOW_DEPTH_CHECK:
+        if MAX_DEPTH < parent.depth:
+            STOP_SEARCH = True
+            MAX_DEPTH_FLAG = True
 
     
     for title in links:        
@@ -206,7 +207,7 @@ def add_links_to_tree(links, parent, end_article, q, found):
         #print(f'Depth is now: {child.depth}')
         if title == end_article:
             found.put(child) #Adding the child to the found queue where it is retreived for path analysis
-            stop_search = True #Raising the stop flag
+            STOP_SEARCH = True #Raising the stop flag
             break
     
     
@@ -215,7 +216,7 @@ def add_links_to_tree(links, parent, end_article, q, found):
 #Processes one child node at once. Gets all the links it has and adds the links as childs back to itself
 def worker(end_article, q, found):
     #Will get a child node from the queue until a stop flag is raised indicating that the article is found
-    while not stop_search:
+    while not STOP_SEARCH:
         try:
             article = q.get(0) #Always getting the child that has been waiting the longest FIFO
             links = get_links(article.article_header)
@@ -240,7 +241,7 @@ def worker(end_article, q, found):
 def handle_search(start_article, end_article):
     #Adding a lock for this fuction. Otherwise running this with another RPC thread would couse problems
     with lock:
-        global stop_search, max_detph
+        global STOP_SEARCH, MAX_DEPTH_FLAG
         links = [] #Array for links that is needed for creating the root node
         q = queue.Queue()   #Queue that keeps track of the child nodes that need to be processed next. Child nodes are added breadth first
         found = queue.Queue()   #Queue that will be used to transfer the child node that has the end article
@@ -270,7 +271,7 @@ def handle_search(start_article, end_article):
 
 
         #If the max_depth flag was raised
-        if max_detph:
+        if MAX_DEPTH_FLAG:
             #Clearing the queues when exiting the thread: https://stackoverflow.com/questions/6517953/clear-all-items-from-the-queue
             with q.mutex:
                 q.queue.clear()
@@ -279,8 +280,8 @@ def handle_search(start_article, end_article):
                 found.queue.clear()
         
             #Resetting the global flags
-            stop_search = False 
-            max_detph = False
+            STOP_SEARCH = False 
+            MAX_DEPTH_FLAG = False
 
             return_message = {
                 'success': False,
@@ -307,8 +308,8 @@ def handle_search(start_article, end_article):
             found.queue.clear()
         
         #Resetting the global flags
-        stop_search = False 
-        max_detph = False
+        STOP_SEARCH = False 
+        MAX_DEPTH_FLAG = False
 
         return json.dumps(return_message)
 
@@ -333,9 +334,9 @@ def run_server(host=hostname, port=portnumber):
 def main():
     run_server()
 
+#For closing the server
 try:
     main()
 except KeyboardInterrupt as e:
-    print(e)
     print('Closing the server...')
     exit(0)
