@@ -17,7 +17,8 @@ lock = threading.Lock()
 lock3 = threading.Lock()
 
 
-#The Class SimpleThreadedXMLRPCServer and run_server function is heavily inspired by these threads: https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
+#The Class SimpleThreadedXMLRPCServer and run_server function is heavily inspired by these threads: 
+# https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
 # https://stackoverflow.com/questions/5033222/is-simplexmlrpcserver-single-threaded
 
 #This class enables this server to handle each request on their own threads
@@ -126,6 +127,7 @@ def check_articles(start_article, end_article):
 
 
 #SOURCE: https://www.mediawiki.org/wiki/API:Links
+#Functions to get the remaining links from the API call
 def get_links_more(url, params, session, links):
     
     while True:
@@ -143,7 +145,7 @@ def get_links_more(url, params, session, links):
             break
         
 
-#Function to retreive the links of a article, is mainly copy pasted from wikipedias documentation!
+#Function to retreive the links of a article, is mainly copy pasted from wikipedia's documentation!
 #SOURCE: https://www.mediawiki.org/wiki/API:Links
 def get_links(parent_article):
     
@@ -314,7 +316,7 @@ def handle_search(start_article, end_article):
         return json.dumps(return_message)
 
 
-#Sources for multuthreded rpc server: https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
+#Sources for multithreded rpc server: https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1 
 # https://stackoverflow.com/questions/5033222/is-simplexmlrpcserver-single-threaded
 
 
