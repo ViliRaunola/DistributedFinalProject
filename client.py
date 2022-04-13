@@ -56,7 +56,6 @@ def start_search():
         print(json_response['message'])
         return False
 
-
     return True
 
     
