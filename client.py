@@ -51,7 +51,7 @@ def start_search():
             i = i + 1
             if i < len(path):
                 print('-> ', end='')
-        print(f'\n{start_article} is {i} clicks away from {end_article}')
+        print(f'\n{start_article} is {i-1} clicks away from {end_article}')
     else:
         print(json_response['message'])
         return False
